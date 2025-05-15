@@ -1,0 +1,305 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    --kavak-green: 142 76% 36%;
+    --kavak-blue: 196 100% 45%;
+    --kavak-red: 0 84% 60%;
+    --kavak-yellow: 38 92% 50%;
+    --kavak-gray: 220 14% 96%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    --kavak-green: 142 76% 36%;
+    --kavak-blue: 196 100% 45%;
+    --kavak-red: 0 84% 60%;
+    --kavak-yellow: 38 92% 50%;
+    --kavak-gray: 220 14% 20%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .highlight {
+    @apply font-bold text-blue-800;
+  }
+
+  .dark .highlight {
+    @apply text-blue-400;
+  }
+
+  .keyword {
+    @apply font-extrabold text-blue-900;
+  }
+
+  .dark .keyword {
+    @apply text-blue-300;
+  }
+
+  .step-title {
+    @apply text-2xl font-bold mb-4;
+  }
+
+  .form-section {
+    @apply p-5 rounded-lg bg-gray-50 mb-6 border border-gray-100;
+  }
+
+  .dark .form-section {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  .form-section-title {
+    @apply text-lg font-medium mb-4 flex items-center;
+  }
+
+  .input-label {
+    @apply text-base font-medium mb-1.5 flex items-center;
+  }
+
+  .required-field::after {
+    content: "*";
+    @apply text-red-500 ml-1;
+  }
+
+  .field-hint {
+    @apply text-sm text-gray-500 mt-1;
+  }
+
+  .dark .field-hint {
+    @apply text-gray-400;
+  }
+
+  .form-card {
+    @apply bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300;
+  }
+
+  .dark .form-card {
+    @apply bg-gray-800;
+  }
+
+  .form-card-header {
+    @apply bg-black text-white p-6;
+  }
+
+  .form-card-content {
+    @apply p-6 space-y-6;
+  }
+
+  .btn-primary {
+    @apply bg-blue-700 hover:bg-blue-800 text-white font-medium py-2.5 px-5 rounded-md transition-colors duration-200;
+  }
+
+  .btn-outline {
+    @apply border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium py-2.5 px-5 rounded-md transition-colors duration-200;
+  }
+
+  .dark .btn-outline {
+    @apply border-gray-600 text-gray-300 hover:bg-gray-700;
+  }
+
+  .file-upload-container {
+    @apply border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors;
+  }
+
+  .file-upload-active {
+    @apply border-blue-700 bg-blue-50;
+  }
+
+  .dark .file-upload-active {
+    @apply bg-blue-900/20;
+  }
+
+  .file-upload-hover {
+    @apply border-gray-400 hover:border-gray-500;
+  }
+
+  .progress-container {
+    @apply h-2 bg-gray-200 rounded-full overflow-hidden;
+  }
+
+  .dark .progress-container {
+    @apply bg-gray-700;
+  }
+
+  .progress-bar {
+    @apply h-full bg-blue-700 transition-all duration-300;
+  }
+
+  .checkbox-item {
+    @apply flex items-start space-x-2 p-2 rounded-md hover:bg-gray-100 transition-colors duration-200;
+  }
+
+  .dark .checkbox-item {
+    @apply hover:bg-gray-700;
+  }
+
+  .radio-item {
+    @apply flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 transition-colors duration-200;
+  }
+
+  .dark .radio-item {
+    @apply hover:bg-gray-700;
+  }
+
+  .error-text {
+    @apply text-red-500 text-sm mt-1 flex items-center;
+  }
+
+  .success-text {
+    @apply text-blue-700 text-sm mt-1 flex items-center;
+  }
+
+  .info-box {
+    @apply bg-blue-50 border border-blue-200 rounded-md p-4 text-blue-800;
+  }
+
+  .dark .info-box {
+    @apply bg-blue-900/20 border-blue-800 text-blue-200;
+  }
+
+  .warning-box {
+    @apply bg-yellow-50 border border-yellow-200 rounded-md p-4 text-yellow-800;
+  }
+
+  .dark .warning-box {
+    @apply bg-yellow-900/20 border-yellow-800 text-yellow-200;
+  }
+
+  .success-box {
+    @apply bg-blue-50 border border-blue-200 rounded-md p-4 text-blue-800;
+  }
+
+  .dark .success-box {
+    @apply bg-blue-900/20 border-blue-800 text-blue-200;
+  }
+
+  .error-box {
+    @apply bg-red-50 border border-red-200 rounded-md p-4 text-red-800;
+  }
+
+  .dark .error-box {
+    @apply bg-red-900/20 border-red-800 text-red-200;
+  }
+
+  .summary-item {
+    @apply p-4 flex justify-between border-b last:border-b-0;
+  }
+
+  .summary-label {
+    @apply text-gray-500;
+  }
+
+  .dark .summary-label {
+    @apply text-gray-400;
+  }
+
+  .summary-value {
+    @apply font-medium;
+  }
+
+  .summary-section {
+    @apply border rounded-md overflow-hidden mb-4;
+  }
+
+  .summary-header {
+    @apply bg-gray-50 p-3 border-b;
+  }
+
+  .dark .summary-header {
+    @apply bg-gray-800;
+  }
+
+  .summary-content {
+    @apply divide-y;
+  }
+
+  .tooltip {
+    @apply relative inline-block;
+  }
+
+  .tooltip .tooltip-text {
+    @apply invisible absolute z-10 p-2 text-sm text-white bg-gray-900 rounded-md opacity-0 transition-opacity duration-300 w-48;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -24px;
+  }
+
+  .tooltip:hover .tooltip-text {
+    @apply visible opacity-100;
+  }
+
+  .tooltip .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1f2937 transparent transparent transparent;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
