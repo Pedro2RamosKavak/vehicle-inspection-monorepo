@@ -1,10 +1,13 @@
 /**
- * Servicio para almacenamiento de archivos 
- * Utiliza Cloudinary para todos los archivos
+ * Servicio para almacenamiento de archivos en Firebase Storage
  */
 
 import { storage } from "./firebase-config";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storeFile } from "@/app/api/file-proxy/[id]/route"
+
+// Obtener la API Key de ImgBB desde variables de entorno
+const IMGBB_API_KEY = process.env.NEXT_PUBLIC_IMGBB_API_KEY || "f3ed22278d71d7e5c9bf2283eccc5393";
 
 /**
  * Comprime una imagen antes de subirla para mejorar el rendimiento
@@ -120,78 +123,55 @@ export async function compressImage(file: File, maxWidth: number = 800, quality:
 }
 
 /**
- * Sube un archivo a Cloudinary a través del endpoint del servidor
- * @param file Archivo a subir
- * @returns URL del archivo subido
+ * Sube un archivo de imagen a ImgBB y devuelve la URL
+ * @param file Archivo de imagen a subir
+ * @returns URL de la imagen subida
  */
-export async function uploadFileToCloudinary(file: File): Promise<string> {
+export async function uploadFileToImgBB(file: File): Promise<string> {
   try {
-    console.log(`Preparando subida a Cloudinary: ${file.name} (${Math.round(file.size / 1024)} KB, tipo: ${file.type})`);
-    
-    // Para archivos grandes, especialmente videos, mostrar advertencia
-    const isLargeFile = file.size > 40 * 1024 * 1024; // 40MB
-    const isVideo = file.type.startsWith('video/');
-    
-    if (isLargeFile && isVideo) {
-      console.log(`⚠️ Archivo de video grande (${Math.round(file.size / 1024 / 1024)}MB). El procesamiento puede tomar más tiempo.`);
-    }
+    console.log(`Preparando subida a ImgBB: ${file.name} (${Math.round(file.size / 1024)} KB, tipo: ${file.type})`);
     
     // Comprimir imagen antes de subir si es una imagen
     const compressedFile = await compressImage(file);
     
-    // Convertir archivo a blob para envío
-    const blob = new Blob([await compressedFile.arrayBuffer()], { type: compressedFile.type });
-    
-    // Crear FormData
+    // Crear FormData para la subida
     const formData = new FormData();
-    formData.append('file', blob, compressedFile.name);
+    formData.append('image', compressedFile);
     
-    // Enviar al endpoint del servidor que maneja la subida a Cloudinary
-    const response = await fetch('/api/upload', {
+    // Usar la API key desde variables de entorno
+    const apiKey = IMGBB_API_KEY;
+    
+    // Construir URL con la clave API y agregar parámetro de expiración (10 minutos)
+    const url = `https://api.imgbb.com/1/upload?key=${apiKey}&name=${encodeURIComponent(file.name)}&expiration=600`;
+    
+    console.log(`Enviando imagen a ImgBB: ${file.name}`);
+    
+    // Enviar la imagen a ImgBB
+    const response = await fetch(url, {
       method: 'POST',
-      body: formData
+      body: formData,
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error en respuesta de ImgBB: ${response.status} - ${errorText}`);
+    }
     
     const data = await response.json();
     
-    if (!response.ok) {
-      // Verificar si es el error específico de video demasiado grande
-      if (data.message && data.message.includes('Video is too large')) {
-        console.error('Error: El video es demasiado grande para procesamiento sincrónico.');
-        
-        // Opción 1: Devolver URL de placeholder para video
-        return `https://placehold.co/600x400/blue/white?text=${encodeURIComponent('Video demasiado grande para vista previa')}`;
-        
-        // Opción alternativa: Intentar con un servicio diferente o fragmentar el video
-        // TODO: Implementar lógica para manejar videos muy grandes
-      }
-      
-      throw new Error(`Error en respuesta del servidor: ${response.status} - ${JSON.stringify(data)}`);
+    // Verificar si la respuesta contiene la URL según la estructura documentada
+    if (!data.success) {
+      throw new Error(`ImgBB rechazó la imagen: ${JSON.stringify(data)}`);
     }
     
-    if (!data.success || !data.url) {
-      throw new Error(`Error al subir archivo: ${JSON.stringify(data)}`);
-    }
+    console.log(`Imagen subida con éxito a ImgBB. ID: ${data.data.id}, URL: ${data.data.url}`);
     
-    console.log(`Archivo subido con éxito a Cloudinary: ${data.url}`);
-    return data.url;
+    // Devolver la URL de la imagen según la documentación
+    // Usar display_url para obtener la versión optimizada para mostrar
+    return data.data.display_url || data.data.url;
   } catch (error: any) {
-    console.error('Error al subir archivo a Cloudinary:', error);
-    
-    // Información de debug adicional
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.error('Error de red en fetch. Posible problema de CORS o conexión');
-    }
-    
-    // Manejo específico para errores conocidos de Cloudinary
-    if (error.message && error.message.includes('Video is too large')) {
-      return `https://placehold.co/600x400/blue/white?text=${encodeURIComponent('Video demasiado grande para vista previa')}`;
-    }
-    
+    console.error('Error al subir imagen a ImgBB:', error);
     // Devolver una URL de imagen de error para que no rompa la aplicación
-    return `https://placehold.co/600x400/red/white?text=${encodeURIComponent('Error: ' + (error.message || 'Desconocido'))}`;
+    return 'https://placehold.co/600x400/red/white?text=Error+al+cargar+imagen';
   }
-}
-
-// Por compatibilidad con el código existente, aliasing de la función
-export const uploadFileToImgBB = uploadFileToCloudinary;
+} 

@@ -1,98 +1,115 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { saveInspection } from "@/lib/server-storage"
 
 export async function POST(request: NextRequest) {
+  console.log("Recibida solicitud en /api/submit-form")
+  
   try {
-    console.log("Recibida solicitud en /api/submit-form")
-
-    // Verificar si es una solicitud multipart/form-data o JSON
-    const contentType = request.headers.get("content-type") || ""
-    let data: any = {}
-
-    if (contentType.includes("multipart/form-data")) {
-      // Procesar form-data
-      const formData = await request.formData()
-
-      // Convertir FormData a objeto para enviar a Zapier
-      formData.forEach((value, key) => {
-        // Si es un archivo, solo guardamos información básica
-        if (value instanceof File) {
-          data[key] = {
-            name: value.name,
-            type: value.type,
-            size: value.size,
-          }
-        } else {
-          data[key] = value
-        }
-      })
-
-      // Mantener el FormData original para posibles usos futuros
-      data._formData = Object.fromEntries(formData)
-    } else {
-      // Procesar JSON
-      data = await request.json()
-
-      // Si hay archivos en base64, procesarlos para Zapier
-      if (data.files_base64) {
-        // Extraer los archivos base64 y añadirlos como campos separados para Zapier
-        Object.entries(data.files_base64).forEach(([key, fileData]: [string, any]) => {
-          // Crear un campo específico para cada archivo con su contenido base64
-          // Zapier puede usar estos campos para crear archivos
-          data[`${key}_file_content`] = fileData.content
-          data[`${key}_file_name`] = fileData.name
-          data[`${key}_file_type`] = fileData.type
-        })
-      }
+    // Obtener los datos de la solicitud
+    const data = await request.json()
+    
+    // Generar un ID único para la inspección
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substring(2, 10)
+    const inspectionId = `insp_${timestamp}_${randomId}`
+    
+    // Agregar información adicional a los datos
+    const dataWithMetadata = {
+      ...data,
+      id: inspectionId,
+      submissionDate: new Date().toISOString()
     }
-
-    // Enviar a Zapier
-    const zapierWebhookUrl = process.env.NEXT_PUBLIC_ZAPIER_WEBHOOK_URL
-
-    if (!zapierWebhookUrl) {
-      console.error("URL del webhook de Zapier no configurada")
-      return NextResponse.json({ error: "URL del webhook de Zapier no configurada" }, { status: 500 })
-    }
-
-    console.log("Enviando datos a Zapier:", zapierWebhookUrl)
-
-    // Enviar los datos a Zapier
-    const zapierResponse = await fetch(zapierWebhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
+    
+    // Guardar la inspección en el servidor (pasando un único objeto como espera la función)
+    await saveInspection(dataWithMetadata)
+    console.log("Inspección guardada en el servidor con ID:", inspectionId)
+    
+    // Obtener URLs de imágenes (si fueron proporcionadas)
+    const crlvImageUrl = data.crlv_image_url || data.crlvPhotoUrl || ""
+    const safetyItemsImageUrl = data.safety_items_image_url || data.safetyItemsPhotoUrl || ""
+    const windshieldPhotoUrl = data.windshieldPhotoUrl || ""
+    const lightsPhotoUrl = data.lightsPhotoUrl || ""
+    const tiresPhotoUrl = data.tiresPhotoUrl || ""
+    const videoFileUrl = data.videoFileUrl || ""
+    
+    console.log("URLs de imágenes recibidas:", {
+      crlv_image_url: crlvImageUrl,
+      safety_items_image_url: safetyItemsImageUrl,
+      windshield_photo_url: windshieldPhotoUrl,
+      lights_photo_url: lightsPhotoUrl,
+      tires_photo_url: tiresPhotoUrl,
+      video_file_url: videoFileUrl
     })
-
-    if (!zapierResponse.ok) {
-      const errorText = await zapierResponse.text()
-      console.error("Error en la respuesta de Zapier:", errorText)
-      throw new Error(`Error al enviar a Zapier: ${zapierResponse.status} ${zapierResponse.statusText}`)
-    }
-
-    let zapierResult
-    try {
+    
+    // Solo mostrar las claves para debugging
+    console.log("Datos a enviar a Zapier:", Object.keys(data))
+    
+    // Enviar datos a Zapier si está configurado
+    let zapierResult = {}
+    const webhookUrl = process.env.NEXT_PUBLIC_ZAPIER_WEBHOOK_URL
+    
+    if (!webhookUrl) {
+      console.error("URL del webhook de Zapier no configurada")
+    } else {
+      console.log(`Enviando datos a Zapier: ${webhookUrl}`)
+      
+      // Realizar la petición a Zapier
+      const zapierResponse = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+      })
+      
+      if (!zapierResponse.ok) {
+        const errorText = await zapierResponse.text()
+        console.error("Error en la respuesta de Zapier:", errorText)
+        throw new Error(`Error al enviar a Zapier: ${zapierResponse.status} ${zapierResponse.statusText}`)
+      }
+      
+      // Obtener y mostrar la respuesta de Zapier
       zapierResult = await zapierResponse.json()
       console.log("Respuesta de Zapier:", zapierResult)
-    } catch (e) {
-      console.log("No se pudo parsear la respuesta de Zapier como JSON, pero la solicitud fue exitosa")
-      zapierResult = { success: true, message: "Datos recibidos por Zapier" }
     }
-
+    
+    // Crear un objeto con los datos de la inspección incluyendo todas las URLs
+    const inspectionData = {
+      id: inspectionId,
+      titular: data.titular || data.ownerName || 'Sin nombre',
+      placa: data.placa || data.licensePlate || 'Sin placa',
+      email: data.email || 'Sin email',
+      submissionDate: new Date().toISOString(),
+      // Incluir URLs de imágenes y video
+      crlvPhotoUrl: crlvImageUrl,
+      safetyItemsPhotoUrl: safetyItemsImageUrl,
+      windshieldPhotoUrl: windshieldPhotoUrl,
+      lightsPhotoUrl: lightsPhotoUrl,
+      tiresPhotoUrl: tiresPhotoUrl,
+      videoFileUrl: videoFileUrl
+    }
+    
+    // Devolver una respuesta exitosa con información relevante
+    // Incluimos instrucción para almacenar en localStorage
     return NextResponse.json({
       success: true,
-      message: "Datos enviados a Zapier correctamente",
-      zapierResponse: zapierResult,
+      inspectionId,
+      zapierResult,
+      storeInLocalStorage: true, // Bandera para indicar al cliente que guarde localmente
+      inspectionData
     })
+    
   } catch (error: any) {
     console.error("Error en submit-form:", error)
-
+    
+    // Devolver error
     return NextResponse.json(
-      {
-        error: "Error al procesar la solicitud",
+      { 
+        success: false, 
+        error: "Error al procesar la solicitud", 
         message: error.message,
       },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }

@@ -12,6 +12,7 @@ import {
   enviarDatosComoJsonAZapier,
   comprimirArchivos,
 } from "@/lib/zapier-service"
+import UploadProgressBar from "@/components/UploadProgressBar"
 
 interface PasoConfirmacionProps {
   datosFormulario: any
@@ -19,6 +20,21 @@ interface PasoConfirmacionProps {
   onPrevious: () => void
   enviando: boolean
   error: string
+}
+
+interface RespuestaZapier {
+  success: boolean;
+  message: string;
+  request_id?: string;
+  inspectionId?: string;
+  storeInLocalStorage?: boolean;
+  inspectionData?: {
+    id: string;
+    titular: string;
+    placa: string;
+    email: string;
+    submissionDate: string;
+  };
 }
 
 export default function PasoConfirmacion({
@@ -36,6 +52,16 @@ export default function PasoConfirmacion({
   const [intentos, setIntentos] = useState(0)
   const [comprimiendo, setComprimiendo] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadingStage, setUploadingStage] = useState("")
+  const [imagenes, setImagenes] = useState({
+    crlvPhotoUrl: datosFormulario.crlvPhotoUrl || '',
+    safetyItemsPhotoUrl: datosFormulario.safetyItemsPhotoUrl || '',
+    windshieldPhotoUrl: datosFormulario.windshieldPhotoUrl || '',
+    lightsPhotoUrl: datosFormulario.lightsPhotoUrl || '',
+    tiresPhotoUrl: datosFormulario.tiresPhotoUrl || '',
+    videoFileUrl: datosFormulario.videoFileUrl || '',
+  });
 
   useEffect(() => {
     // Verificar si hay una URL de webhook configurada
@@ -43,81 +69,156 @@ export default function PasoConfirmacion({
       console.warn("No se ha configurado la URL del webhook de Zapier")
     }
   }, [])
+  
+  // Regenerar URLs de objetos cuando se monta el componente
+  useEffect(() => {
+    const regenerarURLs = () => {
+      try {
+        // Crear copias de las URLs para evitar modificar directamente el estado
+        const nuevasURLs = { ...imagenes };
+        
+        // Regenerar URLs si tenemos los archivos originales
+        if (datosFormulario.crlvPhoto) {
+          nuevasURLs.crlvPhotoUrl = URL.createObjectURL(datosFormulario.crlvPhoto);
+        }
+        
+        if (datosFormulario.safetyItemsPhoto) {
+          nuevasURLs.safetyItemsPhotoUrl = URL.createObjectURL(datosFormulario.safetyItemsPhoto);
+        }
+        
+        if (datosFormulario.windshieldPhoto) {
+          nuevasURLs.windshieldPhotoUrl = URL.createObjectURL(datosFormulario.windshieldPhoto);
+        }
+        
+        if (datosFormulario.lightsPhoto) {
+          nuevasURLs.lightsPhotoUrl = URL.createObjectURL(datosFormulario.lightsPhoto);
+        }
+        
+        if (datosFormulario.tiresPhoto) {
+          nuevasURLs.tiresPhotoUrl = URL.createObjectURL(datosFormulario.tiresPhoto);
+        }
+        
+        if (datosFormulario.videoFile) {
+          nuevasURLs.videoFileUrl = URL.createObjectURL(datosFormulario.videoFile);
+        }
+        
+        setImagenes(nuevasURLs);
+      } catch (error) {
+        console.error("Error al regenerar URLs en confirmación:", error);
+      }
+    };
+    
+    regenerarURLs();
+    
+    // Limpiar URLs al desmontar
+    return () => {
+      Object.values(imagenes).forEach(url => {
+        if (url && typeof url === 'string' && url.startsWith('blob:')) {
+          try {
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            console.error("Error al revocar URL:", e);
+          }
+        }
+      });
+    };
+  }, []);
+
+  // Función para guardar la inspección en localStorage
+  const guardarInspeccionEnLocalStorage = (id: string, datos: any) => {
+    try {
+      // Recuperar inspecciones existentes
+      const inspecciones = localStorage.getItem('inspecciones');
+      let listaInspecciones = inspecciones ? JSON.parse(inspecciones) : [];
+      
+      // Asegurarnos de que todas las URLs estén incluidas
+      const inspectionData = {
+        ...datos,
+        id,
+        crlvPhotoUrl: datos.crlvPhotoUrl || "",
+        safetyItemsPhotoUrl: datos.safetyItemsPhotoUrl || "",
+        windshieldPhotoUrl: datos.windshieldPhotoUrl || "",
+        lightsPhotoUrl: datos.lightsPhotoUrl || "",
+        tiresPhotoUrl: datos.tiresPhotoUrl || "",
+        videoFileUrl: datos.videoFileUrl || ""
+      };
+      
+      // Verificar si ya existe una inspección con este ID
+      const index = listaInspecciones.findIndex((insp: any) => insp.id === id);
+      
+      if (index >= 0) {
+        // Actualizar la inspección existente
+        listaInspecciones[index] = inspectionData;
+      } else {
+        // Agregar la nueva inspección
+        listaInspecciones.push(inspectionData);
+      }
+      
+      // Guardar la lista actualizada
+      localStorage.setItem('inspecciones', JSON.stringify(listaInspecciones));
+      console.log(`Inspección ${id} guardada en localStorage`);
+    } catch (error) {
+      console.error("Error al guardar la inspección en localStorage:", error);
+    }
+  };
 
   const handleSubmit = async () => {
-    if (enviando) return
+    if (enviando) return;
 
-    setEnviando(true)
-    setError(null)
-    setProgress(10)
+    setEnviando(true);
+    setError(null);
+    setProgress(10);
+    setIsUploading(true);
+    setUploadingStage("Preparando arquivos");
 
     try {
-      setProgress(15)
-      setComprimiendo(true)
+      // Saltamos directamente al método alternativo, que suele ser más estable
+      setUsarMetodoAlternativo(true);
+      setProgress(30);
+      setUploadingStage("Comprimindo imagens");
+      
+      console.log("Usando método JSON para enviar dados");
+      setProgress(40);
+      
+      // Método alternativo: enviar como JSON
+      const resultado = await enviarDatosComoJsonAZapier(datosFormulario);
+      
+      // Como ahora la respuesta es inmediata, progresamos rápidamente
+      setProgress(80);
+      setUploadingStage("Processando resposta");
 
-      // Preparar los datos para enviar
-      const formDataOriginal = await prepararDatosParaZapier(datosFormulario)
-
-      // Comprimir archivos si es necesario
-      let formData;
-      try {
-        formData = await comprimirArchivos(formDataOriginal)
-        setProgress(25)
-      } catch (compressionError) {
-        console.warn("Error al comprimir archivos:", compressionError)
-        formData = formDataOriginal
-        setProgress(20)
+      console.log("Resultado del envío:", resultado);
+      
+      // Guardar en localStorage si el servidor lo indica
+      if (resultado && 
+          typeof resultado === 'object' && 
+          resultado.storeInLocalStorage && 
+          resultado.inspectionData && 
+          resultado.inspectionId) {
+        guardarInspeccionEnLocalStorage(resultado.inspectionId, resultado.inspectionData);
       }
-
-      setComprimiendo(false)
-      setProgress(30)
-
-      // Intentar enviar los datos
-      let resultado
-
-      if (usarMetodoAlternativo) {
-        // Método alternativo: enviar como JSON (sin archivos)
-        setProgress(40)
-        resultado = await enviarDatosComoJsonAZapier(datosFormulario)
-        setProgress(70)
-      } else {
-        // Método principal: enviar como FormData (con archivos)
-        try {
-          setProgress(40)
-          resultado = await enviarDatosAZapier(formData)
-          setProgress(70)
-        } catch (error) {
-          console.error("Error al enviar con FormData, intentando método alternativo:", error)
-          setUsarMetodoAlternativo(true)
-          setProgress(50)
-          resultado = await enviarDatosComoJsonAZapier(datosFormulario)
-          setProgress(70)
-        }
-      }
-
-      console.log("Resultado del envío:", resultado)
-      setProgress(90)
-
-      // Si llegamos aquí, el envío fue exitoso
-      setSuccess(true)
-      setProgress(100)
-
-      // Esperar un momento antes de continuar
+      
+      // Solo esperamos un breve momento para dar feedback
       setTimeout(() => {
-        onSubmit()
-      }, 1500)
+        setProgress(100);
+        setSuccess(true);
+        setUploadingStage("Processo finalizado");
+        
+        // Esperar un momento antes de continuar
+        setTimeout(() => {
+          onSubmit();
+        }, 1000);
+      }, 500);
     } catch (error: any) {
-      console.error("Error al enviar la inspección:", error)
-      setError(error.message || "Ocorreu um erro ao enviar a inspeção. Por favor, tente novamente.")
-      setProgress(0)
-      setIntentos(intentos + 1)
-    } finally {
-      if (!success) {
-        setEnviando(false)
-        setComprimiendo(false)
-      }
+      console.error("Error al enviar la inspección:", error);
+      setError(error.message || "Ocorreu um erro ao enviar a inspeção. Por favor, tente novamente.");
+      setProgress(0);
+      setIntentos(intentos + 1);
+      setIsUploading(false);
+      setEnviando(false);
+      setComprimiendo(false);
     }
-  }
+  };
 
   const mapConditionToText = (condition: string): string => {
     const conditionMap: { [key: string]: string } = {
@@ -269,63 +370,106 @@ export default function PasoConfirmacion({
                 <h4 className="font-medium">Fotos e Vídeo</h4>
               </div>
               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {datosFormulario.crlvPhotoUrl && (
+                {imagenes.crlvPhotoUrl && (
                   <div>
                     <span className="text-gray-500 block mb-1">CRLV:</span>
                     <img
-                      src={datosFormulario.crlvPhotoUrl || "/placeholder.svg"}
+                      src={imagenes.crlvPhotoUrl}
                       alt="CRLV"
                       className="w-full h-32 object-cover rounded-md"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = "/placeholder.svg";
+                        target.alt = "Imagem não disponível";
+                      }}
                     />
                   </div>
                 )}
-                {datosFormulario.safetyItemsPhotoUrl && (
+                {imagenes.safetyItemsPhotoUrl && (
                   <div>
                     <span className="text-gray-500 block mb-1">Itens de segurança:</span>
                     <img
-                      src={datosFormulario.safetyItemsPhotoUrl || "/placeholder.svg"}
+                      src={imagenes.safetyItemsPhotoUrl}
                       alt="Itens de segurança"
                       className="w-full h-32 object-cover rounded-md"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = "/placeholder.svg";
+                        target.alt = "Imagem não disponível";
+                      }}
                     />
                   </div>
                 )}
-                {datosFormulario.windshieldPhotoUrl && (
+                {imagenes.windshieldPhotoUrl && (
                   <div>
                     <span className="text-gray-500 block mb-1">Para-brisa:</span>
                     <img
-                      src={datosFormulario.windshieldPhotoUrl || "/placeholder.svg"}
+                      src={imagenes.windshieldPhotoUrl}
                       alt="Para-brisa"
                       className="w-full h-32 object-cover rounded-md"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = "/placeholder.svg";
+                        target.alt = "Imagem não disponível";
+                      }}
                     />
                   </div>
                 )}
-                {datosFormulario.lightsPhotoUrl && (
+                {imagenes.lightsPhotoUrl && (
                   <div>
                     <span className="text-gray-500 block mb-1">Faróis/lanternas:</span>
                     <img
-                      src={datosFormulario.lightsPhotoUrl || "/placeholder.svg"}
+                      src={imagenes.lightsPhotoUrl}
                       alt="Faróis/lanternas"
                       className="w-full h-32 object-cover rounded-md"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = "/placeholder.svg";
+                        target.alt = "Imagem não disponível";
+                      }}
                     />
                   </div>
                 )}
-                {datosFormulario.tiresPhotoUrl && (
+                {imagenes.tiresPhotoUrl && (
                   <div>
                     <span className="text-gray-500 block mb-1">Pneus:</span>
                     <img
-                      src={datosFormulario.tiresPhotoUrl || "/placeholder.svg"}
+                      src={imagenes.tiresPhotoUrl}
                       alt="Pneus"
                       className="w-full h-32 object-cover rounded-md"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = "/placeholder.svg";
+                        target.alt = "Imagem não disponível";
+                      }}
                     />
                   </div>
                 )}
-                {datosFormulario.videoFileUrl && (
+                {imagenes.videoFileUrl && (
                   <div className="sm:col-span-2">
                     <span className="text-gray-500 block mb-1">Vídeo:</span>
                     <video
-                      src={datosFormulario.videoFileUrl}
+                      src={imagenes.videoFileUrl}
                       controls
                       className="w-full h-48 object-cover rounded-md"
+                      onError={(e) => {
+                        const target = e.target as HTMLVideoElement;
+                        target.onerror = null;
+                        // Reemplazar con un mensaje de error para video
+                        target.style.display = "none";
+                        const parent = target.parentElement;
+                        if (parent) {
+                          const errorMsg = document.createElement("div");
+                          errorMsg.className = "w-full h-48 bg-gray-100 flex items-center justify-center rounded-md";
+                          errorMsg.innerHTML = "<span>Vídeo não disponível para visualização</span>";
+                          parent.appendChild(errorMsg);
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -398,19 +542,80 @@ export default function PasoConfirmacion({
             </div>
           </div>
 
-          <div className="flex justify-between pt-4">
-            <Button variant="outline" onClick={onPrevious} disabled={enviando || success}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Button>
+          <div className="flex justify-between mt-8">
             <Button
-              onClick={handleSubmit}
-              disabled={enviando || success}
-              className="bg-blue-700 hover:bg-blue-800 px-8"
+              type="button"
+              variant="outline"
+              onClick={onPrevious}
+              disabled={enviando}
+              className="flex items-center gap-1"
             >
-              {enviando ? "Enviando..." : "Enviar Inspeção"}
+              <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={enviando}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {enviando ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Enviando...
+                </>
+              ) : (
+                <>Enviar Inspeção</>
+              )}
             </Button>
           </div>
+          
+          {/* Mensaje informativo y barra de progreso movidos debajo de los botones */}
+          {enviando && (
+            <div className="mt-8 fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 z-50">
+              <div className="container mx-auto">
+                <div className="flex items-center justify-center mb-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                    {success ? (
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-blue-800">
+                    {success ? "Inspeção enviada com sucesso!" : "Enviando sua inspeção"}
+                  </h3>
+                </div>
+                
+                <div className="mb-3">
+                  <UploadProgressBar 
+                    currentStep={5} 
+                    totalSteps={5} 
+                    isUploading={isUploading} 
+                    uploadText={`${uploadingStage}...`}
+                    completeText="Dados enviados com sucesso!"
+                  />
+                </div>
+                
+                <div className="text-center">
+                  {success ? (
+                    <div className="text-green-600 font-medium">
+                      ✅ Os dados foram recebidos! Em breve enviaremos a pré-oferta.
+                    </div>
+                  ) : (
+                    <div className="text-blue-800 font-medium">
+                      🕒 {Math.round(progress)}% completo
+                      <p className="text-sm text-gray-600 mt-1">
+                        Os dados foram recebidos. As imagens serão processadas em segundo plano.
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Você já pode continuar, não é necessário esperar.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

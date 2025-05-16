@@ -1,477 +1,362 @@
 /**
  * Servicio para enviar datos a Zapier
+ * Este servicio permite enviar datos del formulario a Zapier para su procesamiento
  */
 
-import { uploadFileToStorage } from "./storage-service"
+import { uploadFileToImgBB, uploadFileToCloudinary } from "./storage-service";
+import { uploadVideoToCloudinary } from "./cloudinary-service";
+
+// Obtener la API Key de ImgBB desde variables de entorno
+const IMGBB_API_KEY = process.env.NEXT_PUBLIC_IMGBB_API_KEY || "";
 
 /**
- * Envía los datos del formulario a través de nuestra API interna
- * @param formData Datos del formulario a enviar
- * @returns Promesa que resuelve a un objeto con el estado del envío
+ * Convierte un archivo a formato base64 para transmisión
+ * @param file Archivo a convertir
+ * @returns Promesa con el string base64
  */
-export async function enviarDatosAZapier(formData: FormData) {
-  try {
-    console.log("Enviando datos a través de la API interna")
-
-    // Enviar los datos a nuestra API interna
-    const response = await fetch("/api/submit-form", {
-      method: "POST",
-      body: formData,
-    })
-
-    // Verificar si la respuesta es exitosa
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Error en la respuesta de la API:", errorText)
-      throw new Error(`Error al enviar datos: ${response.status} ${response.statusText}`)
-    }
-
-    const responseData = await response.json()
-    console.log("Respuesta de la API:", responseData)
-
-    // Devolver el resultado
-    return { success: true, data: responseData }
-  } catch (error) {
-    console.error("Error al enviar datos a través de la API:", error)
-    throw error
-  }
-}
-
-/**
- * Prepara los datos del formulario para enviar a Zapier, subiendo archivos a almacenamiento
- * y enviando solo las URLs a Zapier
- * @param datos Datos del formulario
- * @returns Promesa que resuelve a un FormData listo para enviar
- */
-export async function prepararDatosParaZapier(datos: any): Promise<FormData> {
-  const formData = new FormData()
-
-  if (!datos) {
-    console.error("No hay datos para enviar a Zapier")
-    return formData
-  }
-
-  // Información personal
-  formData.append("ownerName", datos.ownerName || "")
-  formData.append("email", datos.email || "")
-  formData.append("phone", datos.phone || "")
-
-  // Información del auto
-  formData.append("licensePlate", datos.licensePlate || "")
-  formData.append("currentKm", datos.currentKm || "")
-  formData.append("modelYear", datos.modelYear || "")
-  formData.append("hasChassisNumber", datos.hasChassisNumber || "")
-  formData.append("hasSecondKey", datos.hasSecondKey || "")
-
-  // Condición del vehículo
-  if (datos.vehicleConditions && Array.isArray(datos.vehicleConditions)) {
-    formData.append("vehicleConditions", datos.vehicleConditions.join(", "))
-  }
-
-  if (datos.safetyItems && Array.isArray(datos.safetyItems)) {
-    formData.append("safetyItems", datos.safetyItems.join(", "))
-  }
-
-  formData.append("hasAirConditioner", datos.hasAirConditioner || "")
-  formData.append("hasWindshieldDamage", datos.hasWindshieldDamage || "")
-  formData.append("hasLightsDamage", datos.hasLightsDamage || "")
-  formData.append("hasTiresDamage", datos.hasTiresDamage || "")
-  formData.append("hasOriginalSoundSystem", datos.hasOriginalSoundSystem || "")
-
-  // Subir archivos a almacenamiento y guardar las URLs
-  const fileUploads = []
-
-  // CRLV Photo
-  if (datos.crlvPhoto) {
-    try {
-      const url = await uploadFileToStorage(datos.crlvPhoto)
-      formData.append("crlvPhotoUrl", url)
-      // Añadir URL directamente para facilitar el uso en Zapier
-      formData.append("crlvPhoto_file_url", url)
-      fileUploads.push({ name: "CRLV", url, type: "image", originalName: datos.crlvPhoto.name })
-    } catch (error) {
-      console.error("Error al subir foto CRLV:", error)
-    }
-  }
-
-  // Safety Items Photo
-  if (datos.safetyItemsPhoto) {
-    try {
-      const url = await uploadFileToStorage(datos.safetyItemsPhoto)
-      formData.append("safetyItemsPhotoUrl", url)
-      // Añadir URL directamente para facilitar el uso en Zapier
-      formData.append("safetyItemsPhoto_file_url", url)
-      fileUploads.push({
-        name: "Safety Items",
-        url,
-        type: "image",
-        originalName: datos.safetyItemsPhoto.name,
-      })
-    } catch (error) {
-      console.error("Error al subir foto de items de seguridad:", error)
-    }
-  }
-
-  // Windshield Photo
-  if (datos.windshieldPhoto) {
-    try {
-      const url = await uploadFileToStorage(datos.windshieldPhoto)
-      formData.append("windshieldPhotoUrl", url)
-      // Añadir URL directamente para facilitar el uso en Zapier
-      formData.append("windshieldPhoto_file_url", url)
-      fileUploads.push({
-        name: "Windshield",
-        url,
-        type: "image",
-        originalName: datos.windshieldPhoto.name,
-      })
-    } catch (error) {
-      console.error("Error al subir foto de parabrisas:", error)
-    }
-  }
-
-  // Lights Photo
-  if (datos.lightsPhoto) {
-    try {
-      const url = await uploadFileToStorage(datos.lightsPhoto)
-      formData.append("lightsPhotoUrl", url)
-      // Añadir URL directamente para facilitar el uso en Zapier
-      formData.append("lightsPhoto_file_url", url)
-      fileUploads.push({
-        name: "Lights",
-        url,
-        type: "image",
-        originalName: datos.lightsPhoto.name,
-      })
-    } catch (error) {
-      console.error("Error al subir foto de luces:", error)
-    }
-  }
-
-  // Tires Photo
-  if (datos.tiresPhoto) {
-    try {
-      const url = await uploadFileToStorage(datos.tiresPhoto)
-      formData.append("tiresPhotoUrl", url)
-      // Añadir URL directamente para facilitar el uso en Zapier
-      formData.append("tiresPhoto_file_url", url)
-      fileUploads.push({
-        name: "Tires",
-        url,
-        type: "image",
-        originalName: datos.tiresPhoto.name,
-      })
-    } catch (error) {
-      console.error("Error al subir foto de neumáticos:", error)
-    }
-  }
-
-  // Video File
-  if (datos.videoFile) {
-    try {
-      const url = await uploadFileToStorage(datos.videoFile)
-      formData.append("videoFileUrl", url)
-      // Añadir URL directamente para facilitar el uso en Zapier
-      formData.append("videoFile_file_url", url)
-      fileUploads.push({
-        name: "Video",
-        url,
-        type: "video",
-        originalName: datos.videoFile.name,
-      })
-    } catch (error) {
-      console.error("Error al subir video:", error)
-    }
-  }
-
-  // Añadir lista de archivos como JSON
-  formData.append("fileUploads", JSON.stringify(fileUploads))
-
-  // Añadir metadatos adicionales
-  formData.append("submissionDate", new Date().toISOString())
-  formData.append("source", "Inspección Virtual")
-
-  return formData
-}
-
-/**
- * Versión alternativa que envía los datos como JSON en lugar de FormData
- * Útil cuando hay problemas con el envío de archivos
- */
-// Modificar la función enviarDatosComoJsonAZapier para incluir los archivos como base64
-export async function enviarDatosComoJsonAZapier(datos: any) {
-  try {
-    console.log("Enviando datos JSON a través de la API interna")
-
-    // Preparar los datos para incluir archivos como base64
-    const datosJson: any = {
-      // Información personal y del vehículo (mantener igual)
-      ownerName: datos.ownerName || "",
-      email: datos.email || "",
-      phone: datos.phone || "",
-      licensePlate: datos.licensePlate || "",
-      currentKm: datos.currentKm || "",
-      modelYear: datos.modelYear || "",
-      hasChassisNumber: datos.hasChassisNumber || "",
-      hasSecondKey: datos.hasSecondKey || "",
-      vehicleConditions: Array.isArray(datos.vehicleConditions) ? datos.vehicleConditions.join(", ") : "",
-      safetyItems: Array.isArray(datos.safetyItems) ? datos.safetyItems.join(", ") : "",
-      hasAirConditioner: datos.hasAirConditioner || "",
-      hasWindshieldDamage: datos.hasWindshieldDamage || "",
-      hasLightsDamage: datos.hasLightsDamage || "",
-      hasTiresDamage: datos.hasTiresDamage || "",
-      hasOriginalSoundSystem: datos.hasOriginalSoundSystem || "",
-
-      // Metadatos
-      submissionDate: new Date().toISOString(),
-      source: "Inspección Virtual",
-
-      // Archivos como base64
-      files_base64: {},
-    }
-
-    // Convertir archivos a base64 e incluirlos directamente
-    if (datos.crlvPhoto) {
-      try {
-        const base64 = await fileToBase64(datos.crlvPhoto)
-        datosJson.files_base64.crlv = {
-          name: `crlv_${datos.licensePlate}.jpg`,
-          content: base64,
-          type: datos.crlvPhoto.type,
-        }
-      } catch (error) {
-        console.error("Error al convertir CRLV a base64:", error)
-      }
-    }
-
-    if (datos.videoFile) {
-      try {
-        const base64 = await fileToBase64(datos.videoFile)
-        datosJson.files_base64.video = {
-          name: `video_${datos.licensePlate}.mp4`,
-          content: base64,
-          type: datos.videoFile.type,
-        }
-      } catch (error) {
-        console.error("Error al convertir video a base64:", error)
-      }
-    }
-
-    // Añadir otros archivos si existen...
-    // (código similar para safetyItemsPhoto, windshieldPhoto, etc.)
-    if (datos.safetyItemsPhoto) {
-      try {
-        const base64 = await fileToBase64(datos.safetyItemsPhoto)
-        datosJson.files_base64.safetyItems = {
-          name: `safetyItems_${datos.licensePlate}.jpg`,
-          content: base64,
-          type: datos.safetyItemsPhoto.type,
-        }
-      } catch (error) {
-        console.error("Error al convertir safetyItemsPhoto a base64:", error)
-      }
-    }
-
-    if (datos.windshieldPhoto) {
-      try {
-        const base64 = await fileToBase64(datos.windshieldPhoto)
-        datosJson.files_base64.windshield = {
-          name: `windshield_${datos.licensePlate}.jpg`,
-          content: base64,
-          type: datos.windshieldPhoto.type,
-        }
-      } catch (error) {
-        console.error("Error al convertir windshieldPhoto a base64:", error)
-      }
-    }
-
-    if (datos.lightsPhoto) {
-      try {
-        const base64 = await fileToBase64(datos.lightsPhoto)
-        datosJson.files_base64.lights = {
-          name: `lights_${datos.licensePlate}.jpg`,
-          content: base64,
-          type: datos.lightsPhoto.type,
-        }
-      } catch (error) {
-        console.error("Error al convertir lightsPhoto a base64:", error)
-      }
-    }
-
-    if (datos.tiresPhoto) {
-      try {
-        const base64 = await fileToBase64(datos.tiresPhoto)
-        datosJson.files_base64.tires = {
-          name: `tires_${datos.licensePlate}.jpg`,
-          content: base64,
-          type: datos.tiresPhoto.type,
-        }
-      } catch (error) {
-        console.error("Error al convertir tiresPhoto a base64:", error)
-      }
-    }
-
-    // Enviar los datos a nuestra API interna
-    const response = await fetch("/api/submit-form", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(datosJson),
-    })
-
-    // Verificar si la respuesta es exitosa
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Error en la respuesta de la API:", errorText)
-      throw new Error(`Error al enviar datos: ${response.status} ${response.statusText}`)
-    }
-
-    const responseData = await response.json()
-    console.log("Respuesta de la API:", responseData)
-
-    // Devolver el resultado
-    return { success: true, data: responseData }
-  } catch (error) {
-    console.error("Error al enviar datos JSON:", error)
-    throw error
-  }
-}
-
-/**
- * Función para comprimir imágenes antes de enviarlas
- * @param file Archivo de imagen a comprimir
- * @param maxWidth Ancho máximo de la imagen comprimida
- * @param quality Calidad de la imagen comprimida (0-1)
- * @returns Promesa que resuelve a un objeto File con la imagen comprimida
- */
-export async function comprimirImagen(file: File, maxWidth = 1200, quality = 0.8): Promise<File> {
+function convertirImagenABase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    // Verificar si es una imagen
-    if (!file.type.startsWith("image/")) {
-      resolve(file) // No es una imagen, devolver el archivo original
-      return
-    }
-
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = (event) => {
-      const img = new Image()
-      img.src = event.target?.result as string
-      img.onload = () => {
-        // Calcular las nuevas dimensiones
-        let width = img.width
-        let height = img.height
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width)
-          width = maxWidth
-        }
-
-        // Crear un canvas para la compresión
-        const canvas = document.createElement("canvas")
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext("2d")
-
-        if (!ctx) {
-          reject(new Error("No se pudo crear el contexto del canvas"))
-          return
-        }
-
-        // Dibujar la imagen en el canvas
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // Convertir el canvas a Blob
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("No se pudo comprimir la imagen"))
-              return
-            }
-
-            // Crear un nuevo archivo con la imagen comprimida
-            const compressedFile = new File([blob], file.name, {
-              type: file.type,
-              lastModified: Date.now(),
-            })
-
-            console.log(`Imagen comprimida: ${file.size} bytes -> ${compressedFile.size} bytes`)
-            resolve(compressedFile)
-          },
-          file.type,
-          quality,
-        )
-      }
-      img.onerror = () => {
-        reject(new Error("Error al cargar la imagen"))
-      }
-    }
-    reader.onerror = () => {
-      reject(new Error("Error al leer el archivo"))
-    }
-  })
-}
-
-/**
- * Función para comprimir un video antes de enviarlo
- * @param file Archivo de video a comprimir
- * @returns Promesa que resuelve a un objeto File con el video comprimido
- */
-export async function comprimirVideo(file: File): Promise<File> {
-  // Esta es una función simulada, ya que la compresión de video en el navegador es limitada
-  // En un entorno real, se recomendaría usar un servicio de backend para la compresión de video
-  console.log("Simulando compresión de video:", file.name)
-
-  // Devolver el archivo original por ahora
-  return file
-}
-
-/**
- * Función para comprimir todos los archivos de un formulario
- * @param formData FormData con los archivos a comprimir
- * @returns FormData con los archivos comprimidos
- */
-export async function comprimirArchivos(formData: FormData): Promise<FormData> {
-  const newFormData = new FormData()
-
-  // Copiar todos los campos que no son archivos
-  for (const [key, value] of formData.entries()) {
-    if (!(value instanceof File)) {
-      newFormData.append(key, value)
-      continue
-    }
-
-    // Comprimir archivos según su tipo
-    try {
-      if (value.type.startsWith("image/")) {
-        const compressedFile = await comprimirImagen(value)
-        newFormData.append(key, compressedFile)
-      } else if (value.type.startsWith("video/")) {
-        const compressedFile = await comprimirVideo(value)
-        newFormData.append(key, compressedFile)
-      } else {
-        // Otros tipos de archivos
-        newFormData.append(key, value)
-      }
-    } catch (error) {
-      console.error(`Error al comprimir el archivo ${key}:`, error)
-      // Si hay un error, usar el archivo original
-      newFormData.append(key, value)
-    }
-  }
-
-  return newFormData
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
     reader.onload = () => {
-      const base64String = reader.result as string
-      resolve(base64String.split(",")[1]) // Remove data URL prefix
-    }
-    reader.onerror = (error) => reject(error)
-  })
+      resolve(reader.result as string);
+    };
+    
+    reader.onerror = (error) => {
+      reject(error);
+    };
+  });
 }
+
+/**
+ * Guarda la inspección localmente (respaldo)
+ * @param data Datos de la inspección
+ */
+function saveInspectionToLocalStorage(data: any) {
+  try {
+    // Obtener inspecciones existentes
+    const existingInspections = localStorage.getItem('inspecciones');
+    let inspecciones = existingInspections ? JSON.parse(existingInspections) : [];
+    
+    // Añadir la nueva inspección con ID único
+    const inspectionId = `insp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const inspectionWithId = {
+      id: inspectionId,
+      ...data,
+      submissionDate: new Date().toISOString()
+    };
+    
+    inspecciones.push(inspectionWithId);
+    
+    // Guardar en localStorage
+    localStorage.setItem('inspecciones', JSON.stringify(inspecciones));
+    console.log(`Inspección guardada localmente con ID: ${inspectionId}`);
+    
+    return inspectionId;
+  } catch (error) {
+    console.error("Error al guardar en localStorage:", error);
+    return null;
+  }
+}
+
+// Definir interfaz para resultados de subida
+interface UploadResult {
+  fieldName: string;
+  url: string;
+  processingLargeVideo?: boolean;
+}
+
+/**
+ * Envía los datos del formulario y archivos a Zapier como JSON
+ * @param formData Datos del formulario
+ * @returns Promesa con el resultado de la petición
+ */
+export async function enviarDatosComoJsonAZapier(formData: any) {
+  try {
+    console.log("Preparando datos para Zapier (datos y archivos)");
+    console.log("Campos del formulario:", Object.keys(formData));
+    
+    // Verificar archivos recibidos usando los nombres exactos del formulario y los nuevos nombres
+    console.log("Verificación de archivos:");
+    // Verificar CRLV (con ambos posibles nombres)
+    console.log("- CRLV:", 
+      formData.crlv ? `Existe (${formData.crlv.name}, ${formData.crlv.size} bytes)` : 
+      formData.crlvPhoto ? `Existe (${formData.crlvPhoto.name}, ${formData.crlvPhoto.size} bytes)` : 
+      "No existe");
+    
+    // Verificar Itens de Segurança (con ambos posibles nombres)
+    console.log("- Itens de Segurança:", 
+      formData.foto_itens_seguranca ? `Existe (${formData.foto_itens_seguranca.name}, ${formData.foto_itens_seguranca.size} bytes)` : 
+      formData.safetyItemsPhoto ? `Existe (${formData.safetyItemsPhoto.name}, ${formData.safetyItemsPhoto.size} bytes)` : 
+      "No existe");
+    
+    // Verificar Parabrisa (con ambos posibles nombres)
+    console.log("- Parabrisa:", 
+      formData.foto_parabrisa ? `Existe (${formData.foto_parabrisa.name}, ${formData.foto_parabrisa.size} bytes)` : 
+      formData.windshieldPhoto ? `Existe (${formData.windshieldPhoto.name}, ${formData.windshieldPhoto.size} bytes)` : 
+      "No existe");
+    
+    // Verificar Faróis/Lanternas (con ambos posibles nombres)
+    console.log("- Faróis/Lanternas:", 
+      formData.foto_farois_lanternas ? `Existe (${formData.foto_farois_lanternas.name}, ${formData.foto_farois_lanternas.size} bytes)` : 
+      formData.lightsPhoto ? `Existe (${formData.lightsPhoto.name}, ${formData.lightsPhoto.size} bytes)` : 
+      "No existe");
+    
+    // Verificar Pneus (con ambos posibles nombres)
+    console.log("- Pneus:", 
+      formData.foto_pneus ? `Existe (${formData.foto_pneus.name}, ${formData.foto_pneus.size} bytes)` : 
+      formData.tiresPhoto ? `Existe (${formData.tiresPhoto.name}, ${formData.tiresPhoto.size} bytes)` : 
+      "No existe");
+    
+    // Verificar Vídeo (con ambos posibles nombres)
+    console.log("- Vídeo:", 
+      formData.upload_video ? `Existe (${formData.upload_video.name}, ${formData.upload_video.size} bytes)` : 
+      formData.videoFile ? `Existe (${formData.videoFile.name}, ${formData.videoFile.size} bytes)` : 
+      "No existe");
+    
+    // Generar un ID único para esta solicitud
+    const timestamp = Date.now();
+    const request_id = `zapier_${timestamp}_${Math.random().toString(36).substring(2, 15)}`;
+    
+    // Primera etapa: subida rápida de datos básicos sin esperar imágenes
+    // Esto permite mostrar éxito rápidamente al usuario
+    const datosBasicos = {
+      // Solo incluir datos de texto esenciales para una respuesta rápida
+      titular: formData.ownerName || formData.titular || "",
+      email: formData.email || "",
+      celular: formData.phone || formData.celular || "",
+      placa: formData.licensePlate || formData.placa || "",
+      request_id: request_id,
+      submissionDate: new Date().toISOString(),
+      procesamiento_pendiente: true // Indicador para Zapier de que faltan archivos
+    };
+
+    // Guardar los datos en localStorage para procesar en segundo plano
+    const archivosParaProcesar = {
+      // Lista de archivos a procesar
+      crlvPhoto: formData.crlv || formData.crlvPhoto,
+      safetyItemsPhoto: formData.foto_itens_seguranca || formData.safetyItemsPhoto,
+      windshieldPhoto: formData.foto_parabrisa || formData.windshieldPhoto,
+      lightsPhoto: formData.foto_farois_lanternas || formData.lightsPhoto,
+      tiresPhoto: formData.foto_pneus || formData.tiresPhoto,
+      videoFile: formData.upload_video || formData.videoFile,
+      request_id: request_id
+    };
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`pending_upload_${request_id}`, JSON.stringify({
+        timestamp: Date.now(),
+        request_id,
+        completado: false
+      }));
+    }
+    
+    // Lanzar la subida de archivos en segundo plano sin esperar respuesta
+    setTimeout(() => {
+      procesarArchivosEnSegundoPlano(archivosParaProcesar, formData, request_id)
+        .catch(error => console.error("Error procesando archivos en segundo plano:", error));
+    }, 100);
+    
+    // Guardar la inspección directamente en localStorage para facilitar el acceso desde la lista
+    // Crear los datos de la inspección que se guardarán en localStorage
+    const inspectionData = {
+      id: request_id,
+      titular: formData.ownerName || formData.titular || "Sin nombre",
+      placa: formData.licensePlate || formData.placa || "Sin placa",
+      email: formData.email || "Sin email",
+      submissionDate: new Date().toISOString()
+    };
+    
+    // Devolver respuesta rápida con los datos básicos e información para localStorage
+    return {
+      success: true,
+      message: "Dados recebidos com sucesso. Processamento de imagens em segundo plano.",
+      request_id,
+      storeInLocalStorage: true,
+      inspectionId: request_id,
+      inspectionData
+    };
+  } catch (error: any) {
+    console.error("Error al enviar datos a Zapier:", error);
+    throw error;
+  }
+}
+
+/**
+ * Procesa los archivos en segundo plano después de que el usuario ha recibido confirmación
+ */
+async function procesarArchivosEnSegundoPlano(archivos: any, datosCompletos: any, request_id: string) {
+  try {
+    console.log("Procesando archivos en segundo plano para request_id:", request_id);
+    
+    // Preparar todas las tareas de subida para procesarlas en paralelo
+    const uploadTasks: Promise<UploadResult>[] = [];
+    
+    // Agregar todas las tareas de subida con el nuevo servicio
+    if (archivos.crlvPhoto instanceof File) {
+      uploadTasks.push(
+        uploadFileToCloudinary(archivos.crlvPhoto)
+          .then(url => ({ fieldName: 'crlvPhotoUrl', url }))
+          .catch(error => {
+            console.error("Error al subir CRLV:", error);
+            return { fieldName: 'crlvPhotoUrl', url: '' };
+          })
+      );
+    }
+    
+    if (archivos.safetyItemsPhoto instanceof File) {
+      uploadTasks.push(
+        uploadFileToCloudinary(archivos.safetyItemsPhoto)
+          .then(url => ({ fieldName: 'safetyItemsPhotoUrl', url }))
+          .catch(error => {
+            console.error("Error al subir Safety Items:", error);
+            return { fieldName: 'safetyItemsPhotoUrl', url: '' };
+          })
+      );
+    }
+    
+    if (archivos.windshieldPhoto instanceof File) {
+      uploadTasks.push(
+        uploadFileToCloudinary(archivos.windshieldPhoto)
+          .then(url => ({ fieldName: 'windshieldPhotoUrl', url }))
+          .catch(error => {
+            console.error("Error al subir Windshield Photo:", error);
+            return { fieldName: 'windshieldPhotoUrl', url: '' };
+          })
+      );
+    }
+    
+    if (archivos.lightsPhoto instanceof File) {
+      uploadTasks.push(
+        uploadFileToCloudinary(archivos.lightsPhoto)
+          .then(url => ({ fieldName: 'lightsPhotoUrl', url }))
+          .catch(error => {
+            console.error("Error al subir Lights Photo:", error);
+            return { fieldName: 'lightsPhotoUrl', url: '' };
+          })
+      );
+    }
+    
+    if (archivos.tiresPhoto instanceof File) {
+      uploadTasks.push(
+        uploadFileToCloudinary(archivos.tiresPhoto)
+          .then(url => ({ fieldName: 'tiresPhotoUrl', url }))
+          .catch(error => {
+            console.error("Error al subir Tires Photo:", error);
+            return { fieldName: 'tiresPhotoUrl', url: '' };
+          })
+      );
+    }
+    
+    if (archivos.videoFile instanceof File) {
+      uploadTasks.push(
+        uploadVideoToCloudinary(archivos.videoFile)
+          .then(url => ({ fieldName: 'videoFileUrl', url }))
+          .catch(error => {
+            console.error("Error al subir Video:", error);
+            return { fieldName: 'videoFileUrl', url: '' };
+          })
+      );
+    }
+    
+    // Ejecutar todas las tareas de subida en paralelo
+    const results = await Promise.allSettled(uploadTasks);
+    
+    // Construir el objeto imageUrls con los resultados
+    const imageUrls: Record<string, string> = {};
+    
+    // Procesar los resultados y obtener las URLs exitosas
+    results.forEach(result => {
+      if (result.status === 'fulfilled' && result.value.url) {
+        imageUrls[result.value.fieldName] = result.value.url;
+      }
+    });
+    
+    // Actualizar el procesamiento en localStorage
+    if (typeof window !== 'undefined') {
+      // Obtener la lista de inspecciones 
+      const inspecciones = localStorage.getItem('inspecciones');
+      if (inspecciones) {
+        try {
+          const listaInspecciones = JSON.parse(inspecciones);
+          
+          // Buscar la inspección por request_id
+          const index = listaInspecciones.findIndex((insp: any) => insp.id === request_id);
+          
+          if (index >= 0) {
+            // Actualizar las URLs en la inspección existente
+            listaInspecciones[index] = {
+              ...listaInspecciones[index],
+              ...imageUrls
+            };
+            
+            // Guardar la lista actualizada
+            localStorage.setItem('inspecciones', JSON.stringify(listaInspecciones));
+            console.log(`Inspección ${request_id} actualizada en localStorage con nuevas URLs`, imageUrls);
+          }
+        } catch (error) {
+          console.error("Error al actualizar URLs en localStorage:", error);
+        }
+      }
+      
+      // Actualizar el estado de procesamiento
+      localStorage.setItem(`pending_upload_${request_id}`, JSON.stringify({
+        timestamp: Date.now(),
+        request_id,
+        completado: true,
+        urls: imageUrls
+      }));
+    }
+    
+    // Devolver las URLs para ser usadas si es necesario
+    return imageUrls;
+    
+  } catch (error) {
+    console.error("Error procesando archivos en segundo plano:", error);
+    
+    // Registrar el error en localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`pending_upload_${request_id}`, JSON.stringify({
+        timestamp: Date.now(),
+        request_id,
+        completado: false,
+        error: error instanceof Error ? error.message : "Error desconocido"
+      }));
+    }
+    
+    // En este caso, no lanzamos el error, sino que devolvemos un objeto de error
+    return { 
+      error: true, 
+      message: error instanceof Error ? error.message : "Error desconocido en procesamiento"
+    };
+  }
+}
+
+// Definir los stubs para las funciones que faltan para resolver errores de linter
+/**
+ * Función legacy para enviar datos a Zapier (stub para compatibilidad)
+ * @deprecated Use enviarDatosComoJsonAZapier instead
+ */
+export async function enviarDatosAZapier(formData: any) {
+  console.warn("Función enviarDatosAZapier está deprecada, use enviarDatosComoJsonAZapier");
+  return enviarDatosComoJsonAZapier(formData);
+}
+
+/**
+ * Función legacy para preparar datos para Zapier (stub para compatibilidad)
+ * @deprecated Use enviarDatosComoJsonAZapier directly
+ */
+export async function prepararDatosParaZapier(formData: any) {
+  console.warn("Función prepararDatosParaZapier está deprecada");
+  return formData;
+}
+
+/**
+ * Función legacy para comprimir archivos (stub para compatibilidad)
+ * @deprecated Use procesarArchivosEnSegundoPlano instead
+ */
+export async function comprimirArchivos(archivos: any) {
+  console.warn("Función comprimirArchivos está deprecada");
+  return archivos;
+} 

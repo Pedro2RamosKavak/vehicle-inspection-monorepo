@@ -161,12 +161,14 @@ export default function InspeccionVehiculo() {
         setDatosFormulario((prevState) => ({
           ...prevState,
           ...restoDeLosDatos,
-          crlvPhotoUrl,
-          safetyItemsPhotoUrl,
-          windshieldPhotoUrl,
-          lightsPhotoUrl,
-          tiresPhotoUrl,
-          videoFileUrl,
+          // Conservamos las URLs para la visualización
+          // Pero tendrán que ser regeneradas si son necesarias para mostrar imágenes
+          crlvPhotoUrl: prevState.crlvPhoto ? URL.createObjectURL(prevState.crlvPhoto) : crlvPhotoUrl,
+          safetyItemsPhotoUrl: prevState.safetyItemsPhoto ? URL.createObjectURL(prevState.safetyItemsPhoto) : safetyItemsPhotoUrl,
+          windshieldPhotoUrl: prevState.windshieldPhoto ? URL.createObjectURL(prevState.windshieldPhoto) : windshieldPhotoUrl,
+          lightsPhotoUrl: prevState.lightsPhoto ? URL.createObjectURL(prevState.lightsPhoto) : lightsPhotoUrl,
+          tiresPhotoUrl: prevState.tiresPhoto ? URL.createObjectURL(prevState.tiresPhoto) : tiresPhotoUrl,
+          videoFileUrl: prevState.videoFile ? URL.createObjectURL(prevState.videoFile) : videoFileUrl,
         }))
 
         // Restaurar el paso actual
@@ -175,6 +177,11 @@ export default function InspeccionVehiculo() {
           const paso = Number.parseInt(pasoGuardado)
           setPasoActual(paso)
           actualizarProgreso(paso)
+          
+          // Regenerar URLs si estamos en la confirmación
+          if (PASOS[paso] === "confirmacion") {
+            setTimeout(regenerarURLsDeObjetos, 100);
+          }
         }
       } catch (error) {
         console.error("Error al cargar datos guardados:", error)
@@ -206,6 +213,38 @@ export default function InspeccionVehiculo() {
     setProgreso(porcentaje)
   }
 
+  // Función para recrear las URLs de objetos al navegar entre pasos
+  const regenerarURLsDeObjetos = () => {
+    // Solo recreamos las URLs si los archivos existen pero las URLs están vacías o inválidas
+    try {
+      if (datosFormulario.crlvPhoto && (!datosFormulario.crlvPhotoUrl || !datosFormulario.crlvPhotoUrl.startsWith('blob:'))) {
+        datosFormulario.crlvPhotoUrl = URL.createObjectURL(datosFormulario.crlvPhoto);
+      }
+      
+      if (datosFormulario.safetyItemsPhoto && (!datosFormulario.safetyItemsPhotoUrl || !datosFormulario.safetyItemsPhotoUrl.startsWith('blob:'))) {
+        datosFormulario.safetyItemsPhotoUrl = URL.createObjectURL(datosFormulario.safetyItemsPhoto);
+      }
+      
+      if (datosFormulario.windshieldPhoto && (!datosFormulario.windshieldPhotoUrl || !datosFormulario.windshieldPhotoUrl.startsWith('blob:'))) {
+        datosFormulario.windshieldPhotoUrl = URL.createObjectURL(datosFormulario.windshieldPhoto);
+      }
+      
+      if (datosFormulario.lightsPhoto && (!datosFormulario.lightsPhotoUrl || !datosFormulario.lightsPhotoUrl.startsWith('blob:'))) {
+        datosFormulario.lightsPhotoUrl = URL.createObjectURL(datosFormulario.lightsPhoto);
+      }
+      
+      if (datosFormulario.tiresPhoto && (!datosFormulario.tiresPhotoUrl || !datosFormulario.tiresPhotoUrl.startsWith('blob:'))) {
+        datosFormulario.tiresPhotoUrl = URL.createObjectURL(datosFormulario.tiresPhoto);
+      }
+      
+      if (datosFormulario.videoFile && (!datosFormulario.videoFileUrl || !datosFormulario.videoFileUrl.startsWith('blob:'))) {
+        datosFormulario.videoFileUrl = URL.createObjectURL(datosFormulario.videoFile);
+      }
+    } catch (error) {
+      console.error("Error al regenerar URLs de objetos:", error);
+    }
+  }
+
   // Función para actualizar los datos del formulario
   const actualizarDatos = (datos: any) => {
     setDatosFormulario((prevState) => ({
@@ -222,6 +261,9 @@ export default function InspeccionVehiculo() {
   // Función para avanzar al siguiente paso
   const siguientePaso = () => {
     if (pasoActual < PASOS.length - 1) {
+      // Regenerar URLs de objetos antes de avanzar
+      regenerarURLsDeObjetos();
+      
       // Guardar explícitamente en localStorage antes de avanzar
       const {
         crlvPhoto,
@@ -248,6 +290,9 @@ export default function InspeccionVehiculo() {
   // Función para retroceder al paso anterior
   const pasoAnterior = () => {
     if (pasoActual > 0) {
+      // Regenerar URLs de objetos antes de retroceder
+      regenerarURLsDeObjetos();
+      
       setDirection(-1) // Retrocediendo
       const nuevoPaso = pasoActual - 1
       setPasoActual(nuevoPaso)
@@ -262,6 +307,9 @@ export default function InspeccionVehiculo() {
     setError("")
 
     try {
+      // Regenerar URLs de objetos antes de mostrar la pantalla de agradecimiento
+      regenerarURLsDeObjetos();
+      
       // La lógica de envío ahora está en el componente PasoConfirmacion
       siguientePaso()
     } catch (error: any) {
@@ -419,7 +467,7 @@ export default function InspeccionVehiculo() {
         </div>
 
         {!zapierConfigured && (
-          <Alert variant="warning" className="mb-6 bg-yellow-50 border-yellow-200">
+          <Alert variant="destructive" className="mb-6 bg-yellow-50 border-yellow-200">
             <Info className="h-4 w-4 text-yellow-600" />
             <AlertDescription className="text-yellow-700">
               A URL do webhook do Zapier não está configurada. Os dados do formulário não serão enviados.
