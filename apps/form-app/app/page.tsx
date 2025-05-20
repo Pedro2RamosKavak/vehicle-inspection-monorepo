@@ -1,7 +1,7 @@
+'use client';
+
+import InspeccionVehiculo from '../components/inspeccion-vehiculo';
+
 export default function Page() {
-  return (
-    <main>
-      <h1>¡Funciona el deploy!</h1>
-    </main>
-  );
+  return <InspeccionVehiculo />;
 }
