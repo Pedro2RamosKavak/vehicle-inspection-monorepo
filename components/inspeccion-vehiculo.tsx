@@ -80,9 +80,6 @@ export default function InspeccionVehiculo() {
   // Estado para la dirección de la transición
   const [direction, setDirection] = useState(0)
 
-  // Estado para verificar si la URL de Zapier está configurada
-  const [zapierConfigured, setZapierConfigured] = useState(true)
-
   // Estado para los datos del formulario
   const [datosFormulario, setDatosFormulario] = useState({
     // Información general
@@ -122,17 +119,6 @@ export default function InspeccionVehiculo() {
 
   // Tema
   const { theme } = useTheme()
-
-  // Verificar si la URL de Zapier está configurada
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_ZAPIER_WEBHOOK_URL) {
-      console.warn("La URL del webhook de Zapier no está configurada")
-      setZapierConfigured(false)
-    } else {
-      console.log("URL del webhook de Zapier configurada:", process.env.NEXT_PUBLIC_ZAPIER_WEBHOOK_URL)
-      setZapierConfigured(true)
-    }
-  }, [])
 
   // Cargar datos guardados al iniciar
   useEffect(() => {
@@ -307,11 +293,64 @@ export default function InspeccionVehiculo() {
     setError("")
 
     try {
-      // Regenerar URLs de objetos antes de mostrar la pantalla de agradecimiento
-      regenerarURLsDeObjetos();
-      
-      // La lógica de envío ahora está en el componente PasoConfirmacion
-      siguientePaso()
+      // 1. POST /submit para obtener presigned URLs
+      const requiredFiles = [
+        'crlvPhoto',
+        'safetyItemsPhoto',
+        'windshieldPhoto',
+        'lightsPhoto',
+        'tiresPhoto',
+        'videoFile'
+      ];
+      const body = {
+        email: datosFormulario.email,
+        answers: datosFormulario,
+        requiredFiles
+      };
+      const resp = await fetch('http://localhost:3000/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!resp.ok) throw new Error('Error al crear inspección');
+      const { id, uploadUrls } = await resp.json();
+
+      // 2. Subir cada archivo a S3 y guardar la URL pública
+      const s3Urls: Record<string, string> = {};
+      const fileMap = {
+        crlvPhoto: datosFormulario.crlvPhoto,
+        safetyItemsPhoto: datosFormulario.safetyItemsPhoto,
+        windshieldPhoto: datosFormulario.windshieldPhoto,
+        lightsPhoto: datosFormulario.lightsPhoto,
+        tiresPhoto: datosFormulario.tiresPhoto,
+        videoFile: datosFormulario.videoFile
+      };
+      for (const key of requiredFiles) {
+        const file = fileMap[key];
+        const presignedUrl = uploadUrls[key];
+        if (file && presignedUrl) {
+          await fetch(presignedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': key === 'videoFile' ? 'video/mp4' : 'image/jpeg' },
+            body: file
+          });
+          // Guardar la URL pública (sin query params)
+          s3Urls[`${key}Url`] = presignedUrl.split('?')[0];
+        }
+      }
+      // 3. Enviar los datos finales al backend, incluyendo las URLs públicas
+      const finalData = {
+        id,
+        ...datosFormulario,
+        ...s3Urls
+      };
+      await fetch('http://localhost:3000/submit/final', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalData)
+      });
+      // 4. Mostrar agradecimiento
+      siguientePaso();
     } catch (error: any) {
       console.error("Error al enviar el formulario:", error)
       setError(error.message || "Ocorreu um erro ao enviar o formulário. Por favor, tente novamente.")
@@ -465,15 +504,6 @@ export default function InspeccionVehiculo() {
         <div className="flex justify-center mb-8">
           <img src="/images/KAVAK_LOGO_MAIN_BLACK.png" alt="Kavak Logo" className="h-12 md:h-16" />
         </div>
-
-        {!zapierConfigured && (
-          <Alert variant="destructive" className="mb-6 bg-yellow-50 border-yellow-200">
-            <Info className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-700">
-              A URL do webhook do Zapier não está configurada. Os dados do formulário não serão enviados.
-            </AlertDescription>
-          </Alert>
-        )}
 
         {error && (
           <Alert variant="destructive" className="mb-6">

@@ -1,6 +1,89 @@
+# Multimedia Monorepo
+
+Monorepo Turborepo para inspección y revisión de vehículos.
+
+## Estructura
+
+- `apps/backend` — Backend Express (API REST, S3)
+- `apps/form-app` — Frontend Next.js (formulario)
+- `apps/review-app` — Frontend Next.js (reviewer)
+- `packages/ui` — Componentes UI compartidos
+- `packages/types` — Tipos TypeScript compartidos
+
+## Instalación
+
+```bash
+git clone <repo-url>
+cd <repo>
+npm install
+```
+
+## Variables de entorno
+
+- Copia `.env.example` en cada app y completa los valores necesarios.
+
+## Scripts principales
+
+```bash
+npm run dev       # Desarrollo (todos los apps)
+npm run build     # Build de producción
+npm run lint      # Lint global
+npm run test      # Tests globales
+```
+
+## Despliegue
+
+- Frontends: Vercel (detecta apps/form-app y apps/review-app)
+- Backend: Render/Fly/Railway (apps/backend)
+
+## Notas
+
+- Cada app/package tiene su propia documentación técnica (`TECHNICAL.md`).
+- Los componentes y tipos compartidos se importan como `@ui` y `@types`.
+
 # Sistema de Inspección de Vehículos
 
 Aplicación web para realizar inspecciones vehiculares con capacidad de subir imágenes y videos a Google Drive a través de Zapier.
+
+# 🚀 Nuevo Backend V1 "todo-en-S3"
+
+## Instrucciones rápidas
+
+1. Instala dependencias:
+   ```bash
+   npm install
+   ```
+2. Copia `.env.example` a `.env` y completa tus credenciales AWS.
+3. Corre el backend:
+   ```bash
+   npm run dev
+   ```
+4. Corre los tests:
+   ```bash
+   npm test
+   ```
+
+---
+
+## Variables de entorno necesarias
+
+```
+AWS_ACCESS_KEY_ID=xxxx
+AWS_SECRET_ACCESS_KEY=xxxx
+AWS_REGION=sa-east-1
+BUCKET=multimedia-form-pdr
+```
+
+---
+
+## Endpoints principales
+
+- `POST   /submit`         — Crea registro y retorna presigned URL para video
+- `GET    /review/list`    — Lista revisiones
+- `GET    /review/:id`     — Detalle de revisión
+- `PATCH  /review/:id`     — Aprueba/rechaza revisión
+
+---
 
 ## Características
 
