@@ -1,14 +1,18 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "jsx": "preserve",
+    "target": "esnext",
     "module": "esnext",
     "moduleResolution": "node",
-    "allowJs": true,
-    "esModuleInterop": true,
     "strict": true,
+    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ui/*": ["../../packages/ui/*"],
+      "@types": ["../../packages/types/index.ts"]
+    }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]
